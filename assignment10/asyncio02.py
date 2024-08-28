@@ -1,51 +1,63 @@
-# example of using an asyncio queue without blocking
-from random import random
 import asyncio
- 
-# coroutine to generate work
+from random import random
+import time  # Import time module to measure the total time taken
+
+# Coroutine to generate work (Producer)
 async def producer(queue):
     print('Producer: Running')
-    # generate work
+    start_time = time.time()  # Record the start time for producer
+    # Generate work
     for i in range(10):
-        # generate a value
+        # Generate a value
         value = i
-        # block to simulate work
+        # Block to simulate work
         sleeptime = random()
-        print(f"> Producer {value} sleep {sleeptime}")
+        print(f"Producer {value} sleep {sleeptime}")
         await asyncio.sleep(sleeptime)
-        # add to the queue
-        print(f"> Producer put {value}")
+        # Add the value to the queue
+        print(f"Producer put {value}")
         await queue.put(value)
-    # send an all done signal
+    # Send an all-done signal
     await queue.put(None)
+    end_time = time.time()  # Record the end time for producer
     print('Producer: Done')
- 
-# coroutine to consume work
+    producer_time = end_time - start_time
+    print(f'Producer time taken: {producer_time:.2f} seconds')
+    return producer_time
+
+# Coroutine to consume work (Consumer)
 async def consumer(queue):
     print('Consumer: Running')
-    # consume work
+    start_time = time.time()  # Record the start time for consumer
+    # Consume work
     while True:
-        # get a unit of work without blocking
+        # Get a unit of work without blocking
         try:
             item = queue.get_nowait()
         except asyncio.QueueEmpty:
-            print('Consumer: got nothing, waiting a while...')
+            print('Consumer got nothing, waiting a while...')
             await asyncio.sleep(0.5)
             continue
-        # check for stop
+        # Check for stop
         if item is None:
             break
-        # report
-        print(f'\t> Consumer got {item}')
-    # all done
+        # Report
+        print(f"Consumer got {item}")
+    end_time = time.time()  # Record the end time for consumer
     print('Consumer: Done')
- 
-# entry point coroutine
+    consumer_time = end_time - start_time
+    print(f'Consumer time taken: {consumer_time:.2f} seconds')
+    return consumer_time
+
+# Entry point coroutine
 async def main():
-    # create the shared queue
+    # Create the shared queue
     queue = asyncio.Queue()
-    # run the producer and consumers
-    await asyncio.gather(producer(queue), consumer(queue))
- 
-# start the asyncio program
+    # Run the producer and consumers concurrently, and gather their time results
+    producer_time, consumer_time = await asyncio.gather(producer(queue), consumer(queue))
+    # Calculate the total time taken by both producer and consumer
+    total_time = producer_time + consumer_time
+    print(f'Total time taken by producer and consumer: {total_time:.2f} seconds')
+
+# Start the asyncio program
 asyncio.run(main())
