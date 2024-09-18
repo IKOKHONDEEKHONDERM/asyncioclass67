@@ -1,7 +1,6 @@
 import time
 import asyncio
 from asyncio import Queue
-from random import randrange
 
 # we first implement the Customer and Product classes, 
 # representing customers and products that need to be checked out. 
@@ -16,42 +15,33 @@ class Customer:
     def __init__(self, customer_id: int, products: list[Product]):
         self.customer_id = customer_id
         self.products = products
-
-# we implement a checkout_customer method that acts as a consumer.
-# As long as there is data in the queue, this method will continue to loop. 
-# During each iteration, it uses a get method to retrieve a Customer instance. 
-# 
-# If there is no data in the queue, it will wait. 
-# 
-# After retrieving a piece of data (in this case, a Customer instance), 
-# it iterates through the products attribute and uses asyncio.sleep to simulate the checkout process.
-# 
-# After finishing processing the data, 
-# we use queue.task_done() to tell the queue that the data has been successfully processed.
+        
 async def checkout_customer(queue: Queue, cashier_number: int):
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    cashier_take = {"id" : cashier_number,"customer":0,"time":0}
+    while not queue.empty():
+        customer: Customer = await queue.get()
+        customer_start_time = time.perf_counter()
+        cashier_take['customer'] += 1
+        print(f"The Cashier_ {cashier_number}"
+              f" will checkout Customer_ {customer.customer_id}")
+        for product in customer.products:
+            if cashier_number ==2:
+                product_take_time = 0.1
+            else:
+                product_take_time = round(product.checkout_time+(0.1*cashier_number), ndigits=2)
+                
+            print(f"The Cashier_ {cashier_number}"
+                  f" will checkout Customer_ {customer.customer_id}"
+                  f" Product_ {product.product_name}"
+                  f" in {product.checkout_time} secs")
+            await asyncio.sleep(product_take_time)
+            cashier_take["time"] += product_take_time
+        print(f"The Cashier_ {cashier_number}"
+              f" finish checkout Customer_ {customer.customer_id}"
+              f" in {round(time.perf_counter() - customer_start_time, ndigits=2)} secs")
+        
+        queue.task_done()
+    return cashier_take
 
 # we implement the generate_customer method as a factory method for producing customers.
 #
@@ -71,25 +61,38 @@ async def customer_generation(queue: Queue, customers: int):
     customer_count = 0
     while True:
         customers = [generate_customer(the_id)
-                     for the_id in range(customer_count, customer_count+customers)]
+                     for the_id in range(customer_count,customer_count+customers)]
         for customer in customers:
-            print(f"Waiting to put Customer_{customer.customer_id} in line.... ")
+            print("Waiting to put the customer in line....")
             await queue.put(customer)
-            print(f"Customer_{customer.customer_id} put in line...")
-        customer_count = customer_count + len(customers)
+            print("Customer put in line....")
+        customer_count = customer_count +len(customers)
         await asyncio.sleep(.001)
         return customer_count
 
 # Finally, we use the main method to initialize the queue, 
 # producer, and consumer, and start all concurrent tasks.
 async def main():
-    CUSTOMER = 2
-    QUEUE = 2
-    CASHIER = 2
-    customer_queue = Queue(QUEUE)
-    customers_start_time = time.perf_counter()
-    
+    customer_queue = Queue(5)
+    customer_start_time = time.perf_counter()
     async with asyncio.TaskGroup() as group:
+        customer_group = group.create_task(customer_generation(customer_queue,20))
+        cashiers_group = [group.create_task(checkout_customer(customer_queue,i)) for i in range(5)] 
+
+    print("-"*20)
+    for cg in cashiers_group:
+        if cg.result():
+            cashier = cg.result()
+            print(f"The Cashier_ {cashier['id']}"
+                  f" took {cashier['customer']} customers"
+                  f" time {round(cashier['time'],ndigits=2)} secs")
+    if customer_group.result():
+        print(f"The supermarket process finished "
+            f"{customer_group.result()} customers"
+                f"in {round(time.perf_counter() - customer_start_time,ndigits=2)} secs")
+
     
 if __name__ == "__main__":
     asyncio.run(main())
+
+
